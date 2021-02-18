@@ -7,6 +7,14 @@
 #### Single
 
 ```go
+package main
+
+import (
+		"fmt"
+		"github.com/taybart/cache"
+)
+
+func main() {
 	c := cache.New()
 	defer c.Finish()
 
@@ -16,11 +24,20 @@
 	var item string
 	err := c.Get("test", &item)
   fmt.Println(item) // output: test
+}
 ```
 
 #### Shared
 
 ```go
+package main
+
+import (
+		"fmt"
+		"github.com/taybart/cache"
+)
+
+func main() {
 	c := cache.NewShared() // Will access the same cache across calls
 	defer c.Finish()
 
@@ -30,6 +47,7 @@
 	var item string
 	err := c.Get("test", &item)
   fmt.Println(item) // output: test
+}
 ```
 
 ## Config
@@ -39,9 +57,18 @@ TTL: 24 hours
 PruneRate: 5 Minutes
 
 ```go
+package main
+
+import (
+		"fmt"
+		"github.com/taybart/cache"
+)
+
+func main() {
 	c := cache.New() // Will access the same cache across calls
 	defer c.Finish()
 
 	c.SetTTL(time.Nanosecond) // we really don't care about data here
 	c.SetPruneRate(3*time.Nanosecond) // extend the prune rate to some stuff might live
+}
 ```
