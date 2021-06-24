@@ -70,5 +70,7 @@ func main() {
 
   c.SetTTL(time.Nanosecond) // we really don't care about data here
   c.SetPruneRate(3*time.Nanosecond) // extend the prune rate to some stuff might live
+
+  c.SetPruneRate(0) // actually, don't prune at all
 }
 ```

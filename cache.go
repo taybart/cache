@@ -37,7 +37,7 @@ type Cache struct {
 	TTL       time.Duration
 	Items     map[string]Item
 	PruneRate time.Duration
-	Mu        sync.Mutex
+	Mu        sync.RWMutex
 }
 
 func New() *Cache {
@@ -71,6 +71,9 @@ func (c *Cache) SetTTL(ttl time.Duration) {
 
 func (c *Cache) SetPruneRate(pr time.Duration) {
 	c.PruneRate = pr
+	c.cancel()
+	c.Ctx, c.cancel = context.WithCancel(context.Background())
+	go c.Prune()
 }
 
 func (c *Cache) Set(key string, data interface{}) error {
@@ -108,8 +111,8 @@ func (c *Cache) SetWithTTL(key string, data interface{}, ttl time.Duration) erro
 }
 
 func (c *Cache) Get(key string, data interface{}) error {
-	c.Mu.Lock()
-	defer c.Mu.Unlock()
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
 	if i, ok := c.Items[key]; ok {
 		return gob.NewDecoder(bytes.NewReader(i.Data)).Decode(data)
 	}
@@ -117,12 +120,17 @@ func (c *Cache) Get(key string, data interface{}) error {
 }
 
 func (c *Cache) Prune() {
+	if c.PruneRate == 0 {
+		return
+	}
 	for {
+		time.Sleep(c.PruneRate)
 		select {
 		case <-c.Ctx.Done():
 			break
 		default:
 			if len(c.Items) > 0 {
+				c.Mu.RLock()
 				now := time.Now()
 				for d, i := range c.Items {
 					if now.Sub(i.CreatedAt) > i.TTL {
@@ -131,6 +139,7 @@ func (c *Cache) Prune() {
 						c.Mu.Unlock()
 					}
 				}
+				c.Mu.RUnlock()
 			}
 		}
 	}
