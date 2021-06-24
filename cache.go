@@ -10,7 +10,11 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("Item not found")
+	ErrNotFound = errors.New("item not found")
+)
+
+const (
+	TTLNeverExpire = -1
 )
 
 var (
@@ -135,6 +139,9 @@ func (c *Cache) Prune() {
 					c.Mu.RLock()
 					now := time.Now()
 					for d, i := range c.Items {
+						if i.TTL == TTLNeverExpire {
+							continue
+						}
 						if now.Sub(i.CreatedAt) > i.TTL {
 							c.Mu.RUnlock()
 							c.Mu.Lock()
