@@ -27,9 +27,9 @@ func TestPrune(t *testing.T) {
 
 	c := cache.New()
 	c.SetTTL(time.Millisecond)
-	c.SetPruneRate(2 * time.Millisecond)
+	c.SetPruneRate(5 * time.Millisecond)
 	c.Set("test", "test")
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(15 * time.Millisecond)
 
 	var item string
 	err := c.Get("test", &item)

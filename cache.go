@@ -123,23 +123,28 @@ func (c *Cache) Prune() {
 	if c.PruneRate == 0 {
 		return
 	}
+	lastPrune := time.Now()
 	for {
-		time.Sleep(c.PruneRate)
 		select {
 		case <-c.Ctx.Done():
 			break
 		default:
-			if len(c.Items) > 0 {
-				c.Mu.RLock()
-				now := time.Now()
-				for d, i := range c.Items {
-					if now.Sub(i.CreatedAt) > i.TTL {
-						c.Mu.Lock()
-						delete(c.Items, d)
-						c.Mu.Unlock()
+			if time.Since(lastPrune) > c.PruneRate {
+				lastPrune = time.Now()
+				if len(c.Items) > 0 {
+					c.Mu.RLock()
+					now := time.Now()
+					for d, i := range c.Items {
+						if now.Sub(i.CreatedAt) > i.TTL {
+							c.Mu.RUnlock()
+							c.Mu.Lock()
+							delete(c.Items, d)
+							c.Mu.Unlock()
+							c.Mu.RLock()
+						}
 					}
+					c.Mu.RUnlock()
 				}
-				c.Mu.RUnlock()
 			}
 		}
 	}
