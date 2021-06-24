@@ -52,6 +52,8 @@ func main() {
 
 ## Config
 
+#### Pruning 
+
 Defaults:
 TTL: 24 hours
 PruneRate: 5 Minutes
@@ -65,7 +67,7 @@ import (
 )
 
 func main() {
-  c := cache.New() // Will access the same cache across calls
+  c := cache.New()
   defer c.Finish()
 
   c.SetTTL(time.Nanosecond) // we really don't care about data here
