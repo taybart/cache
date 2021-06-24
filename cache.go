@@ -27,6 +27,7 @@ var (
 
 type Item struct {
 	CreatedAt time.Time
+	TTL       time.Duration
 	Data      []byte
 }
 
@@ -84,6 +85,24 @@ func (c *Cache) Set(key string, data interface{}) error {
 	(*c).Items[key] = Item{
 		CreatedAt: time.Now(),
 		Data:      buf.Bytes(),
+		TTL:       c.TTL,
+	}
+	return nil
+}
+
+func (c *Cache) SetWithTTL(key string, data interface{}, ttl time.Duration) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(data)
+	if err != nil {
+		return err
+	}
+	(*c).Items[key] = Item{
+		CreatedAt: time.Now(),
+		Data:      buf.Bytes(),
+		TTL:       ttl,
 	}
 	return nil
 }
@@ -106,7 +125,7 @@ func (c *Cache) Prune() {
 			if len(c.Items) > 0 {
 				now := time.Now()
 				for d, i := range c.Items {
-					if now.Sub(i.CreatedAt) > c.TTL {
+					if now.Sub(i.CreatedAt) > i.TTL {
 						c.Mu.Lock()
 						delete(c.Items, d)
 						c.Mu.Unlock()
