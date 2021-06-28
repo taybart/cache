@@ -20,6 +20,7 @@ func main() {
 
   // set item
   c.Set("test", "test")
+  c.SetWithTTL("user", "me", cache.TTLNeverExpire)
 
   var item string
   err := c.Get("test", &item)
