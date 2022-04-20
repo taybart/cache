@@ -12,7 +12,7 @@ import (
 func TestGetSet(t *testing.T) {
 	is := is.New(t)
 
-	c := cache.New()
+	c := cache.New(cache.Default())
 	c.Set("test", "test")
 
 	var item string
@@ -25,11 +25,13 @@ func TestGetSet(t *testing.T) {
 func TestPrune(t *testing.T) {
 	is := is.New(t)
 
-	c := cache.New()
-	c.SetTTL(time.Millisecond)
-	c.SetPruneRate(5 * time.Millisecond)
+	c := cache.New(cache.Config{
+		TTL:           time.Millisecond,
+		PruneRate:     time.Millisecond * 5,
+		SleepDuration: time.Millisecond,
+	})
 	c.Set("test", "test")
-	time.Sleep(15 * time.Millisecond)
+	time.Sleep(7 * time.Millisecond)
 
 	var item string
 	err := c.Get("test", &item)

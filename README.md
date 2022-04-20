@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-  c := cache.New()
+  c := cache.New(cache.Default())
   defer c.Finish()
 
   // set item
@@ -39,7 +39,8 @@ import (
 )
 
 func main() {
-  c := cache.NewShared() // Will access the same cache across calls
+  // Will access the same cache across calls
+  c := cache.NewShared(cache.Default())
   defer c.Finish()
 
   // set item
@@ -58,6 +59,7 @@ func main() {
 Defaults:
 TTL: 24 hours
 PruneRate: 5 Minutes
+SleepDuration: 100 Milliseconds
 
 ```go
 package main
@@ -68,11 +70,12 @@ import (
 )
 
 func main() {
-  c := cache.New()
+  c := cache.New(cache.Config{
+    TTL: time.Nanosecond, // we really don't care about data here
+    PruneRate: 3*time.Nanosecond, // extend the prune rate to some stuff might live
+    SleepDuration: time.Hour, // wait an hour between checks
+  })
   defer c.Finish()
-
-  c.SetTTL(time.Nanosecond) // we really don't care about data here
-  c.SetPruneRate(3*time.Nanosecond) // extend the prune rate to some stuff might live
 
   c.SetPruneRate(0) // actually, don't prune at all
 }
