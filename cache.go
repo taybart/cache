@@ -17,22 +17,8 @@ const (
 	TTLNeverExpire = -1
 )
 
-var (
-	defaultConfig = Config{
-		TTL:           time.Hour * 24,
-		PruneRate:     time.Minute * 5,
-		SleepDuration: time.Millisecond * 100,
-	}
-
-	sharedCache = Cache{
-		items: make(map[string]Item),
-	}
-)
-
-type Config struct {
-	TTL           time.Duration
-	PruneRate     time.Duration
-	SleepDuration time.Duration
+var sharedCache = Cache{
+	items: make(map[string]Item),
 }
 
 type Cache struct {
@@ -42,29 +28,13 @@ type Cache struct {
 	cancel context.CancelFunc
 	items  map[string]Item
 	mu     sync.RWMutex
+	subs   map[string][]chan any
 }
 
 type Item struct {
 	CreatedAt time.Time
 	TTL       time.Duration
 	Data      []byte
-}
-
-func Default() Config {
-	return defaultConfig
-}
-
-func (c *Config) Init() {
-	// make sure defaults are preserved
-	if c.TTL == 0 {
-		c.TTL = defaultConfig.TTL
-	}
-	if c.PruneRate == 0 {
-		c.PruneRate = defaultConfig.PruneRate
-	}
-	if c.SleepDuration == 0 {
-		c.SleepDuration = defaultConfig.SleepDuration
-	}
 }
 
 func New(config Config) *Cache {
@@ -77,6 +47,7 @@ func New(config Config) *Cache {
 		Ctx:    ctx,
 		cancel: cancel,
 		items:  make(map[string]Item),
+		subs:   make(map[string][]chan any),
 	}
 	go c.Prune()
 	return c
@@ -97,32 +68,7 @@ func (c *Cache) Finish() {
 	c.cancel()
 }
 
-func (c *Cache) SetConfig(config Config) {
-	c.config = config
-}
-
-// DEPRECATED: should just use config?
-func (c *Cache) SetTTL(ttl time.Duration) {
-	c.config.TTL = ttl
-}
-
-// DEPRECATED: should just use config?
-func (c *Cache) SetPruneRate(pr time.Duration) {
-	c.config.PruneRate = pr
-	c.cancel()
-	c.Ctx, c.cancel = context.WithCancel(context.Background())
-	go c.Prune()
-}
-
-// DEPRECATED: should just use config?
-func (c *Cache) SetSleepDuration(sd time.Duration) {
-	c.config.SleepDuration = sd
-	c.cancel()
-	c.Ctx, c.cancel = context.WithCancel(context.Background())
-	go c.Prune()
-}
-
-func (c *Cache) Set(key string, data interface{}) error {
+func (c *Cache) Set(key string, data any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -136,10 +82,11 @@ func (c *Cache) Set(key string, data interface{}) error {
 		Data:      buf.Bytes(),
 		TTL:       c.config.TTL,
 	}
+	c.updateSubs(key, data)
 	return nil
 }
 
-func (c *Cache) SetWithTTL(key string, data interface{}, ttl time.Duration) error {
+func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -156,7 +103,7 @@ func (c *Cache) SetWithTTL(key string, data interface{}, ttl time.Duration) erro
 	return nil
 }
 
-func (c *Cache) Get(key string, data interface{}) error {
+func (c *Cache) Get(key string, data any) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if i, ok := c.items[key]; ok {
@@ -170,11 +117,11 @@ func (c *Cache) Prune() {
 		return
 	}
 	lastPrune := time.Now()
-pruner:
+prune:
 	for {
 		select {
 		case <-c.Ctx.Done():
-			break pruner
+			break prune
 		default:
 			if time.Since(lastPrune) > c.config.PruneRate {
 				lastPrune = time.Now()
@@ -199,4 +146,43 @@ pruner:
 			time.Sleep(c.config.SleepDuration) // chill for a sec
 		}
 	}
+}
+
+func (c *Cache) Subscribe(key string) chan any {
+	ch := make(chan any)
+	if len(c.subs[key]) == 0 {
+		c.subs[key] = make([]chan any, 0)
+	}
+
+	c.subs[key] = append(c.subs[key], ch)
+
+	return ch
+}
+
+func (c *Cache) updateSubs(key string, update any) {
+	// TODO: work on sub locks
+	for _, ch := range c.subs[key] {
+		ch <- update
+	}
+}
+
+// DEPRECATED: should just use config?
+func (c *Cache) SetTTL(ttl time.Duration) {
+	c.config.TTL = ttl
+}
+
+// DEPRECATED: should just use config?
+func (c *Cache) SetPruneRate(pr time.Duration) {
+	c.config.PruneRate = pr
+	c.cancel()
+	c.Ctx, c.cancel = context.WithCancel(context.Background())
+	go c.Prune()
+}
+
+// DEPRECATED: should just use config?
+func (c *Cache) SetSleepDuration(sd time.Duration) {
+	c.config.SleepDuration = sd
+	c.cancel()
+	c.Ctx, c.cancel = context.WithCancel(context.Background())
+	go c.Prune()
 }
