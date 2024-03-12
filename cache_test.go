@@ -1,8 +1,8 @@
 package cache_test
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +35,7 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestPubSub(t *testing.T) {
-	// is := is.New(t)
+	is := is.New(t)
 
 	c := cache.New(cache.Default())
 	defer c.Finish()
@@ -46,21 +46,37 @@ func TestPubSub(t *testing.T) {
 
 	c.Set("test-gob", testStruct{"test"})
 
-	ch := c.Subscribe("test-gob")
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func(ch chan any) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
+	defer cancel()
+
+	ch := c.Subscribe("test-gob")
+	go func(ctx context.Context, ch chan any) {
 		defer wg.Done()
-		item := <-ch
-		fmt.Println(item.(testStruct).Message)
-	}(ch)
+		select {
+		case <-ctx.Done():
+			is.NoErr(ctx.Err())
+		case item := <-ch:
+			is.True(item.(testStruct).Message == "woohoo")
+			return
+		}
+	}(ctx, ch)
+
 	ch = c.Subscribe("test-gob")
-	go func(ch chan any) {
+	go func(ctx context.Context, ch chan any) {
 		defer wg.Done()
-		item := <-ch
-		fmt.Println(item.(testStruct).Message)
-	}(ch)
+		select {
+		case <-ctx.Done():
+			is.NoErr(ctx.Err())
+		case item := <-ch:
+			is.True(item.(testStruct).Message == "woohoo")
+			return
+		}
+	}(ctx, ch)
 	c.Set("test-gob", testStruct{"woohoo"})
+
 	wg.Wait()
 }
 
