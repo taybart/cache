@@ -10,8 +10,6 @@ import (
 )
 
 var (
-	initd = false
-
 	ErrNotFound = errors.New("item not found")
 )
 
@@ -51,7 +49,6 @@ func New(config Config) *Cache {
 		items:  make(map[string]Item),
 		subs:   make(map[string][]chan any),
 	}
-	initd = true
 	go c.Prune()
 	return c
 }
@@ -72,7 +69,6 @@ func (c *Cache) Finish() {
 }
 
 func (c *Cache) Set(key string, data any) error {
-	c.isStarted()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -91,7 +87,6 @@ func (c *Cache) Set(key string, data any) error {
 }
 
 func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
-	c.isStarted()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -109,7 +104,6 @@ func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
 }
 
 func (c *Cache) Get(key string, data any) error {
-	c.isStarted()
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if i, ok := c.items[key]; ok {
@@ -119,7 +113,6 @@ func (c *Cache) Get(key string, data any) error {
 }
 
 func (c *Cache) Prune() {
-	c.isStarted()
 	if c.config.PruneRate == 0 {
 		return
 	}
@@ -156,7 +149,6 @@ prune:
 }
 
 func (c *Cache) Subscribe(key string) chan any {
-	c.isStarted()
 	ch := make(chan any)
 	if len(c.subs[key]) == 0 {
 		c.subs[key] = make([]chan any, 0)
@@ -172,11 +164,4 @@ func (c *Cache) updateSubs(key string, update any) {
 	for _, ch := range c.subs[key] {
 		ch <- update
 	}
-}
-
-func (c *Cache) isStarted() error {
-	if !initd {
-		return errors.New("cache not started")
-	}
-	return nil
 }
