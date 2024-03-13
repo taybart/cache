@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	initd = false
+
 	ErrNotFound = errors.New("item not found")
 )
 
@@ -166,23 +168,9 @@ func (c *Cache) updateSubs(key string, update any) {
 	}
 }
 
-// DEPRECATED: should just use config?
-func (c *Cache) SetTTL(ttl time.Duration) {
-	c.config.TTL = ttl
-}
-
-// DEPRECATED: should just use config?
-func (c *Cache) SetPruneRate(pr time.Duration) {
-	c.config.PruneRate = pr
-	c.cancel()
-	c.Ctx, c.cancel = context.WithCancel(context.Background())
-	go c.Prune()
-}
-
-// DEPRECATED: should just use config?
-func (c *Cache) SetSleepDuration(sd time.Duration) {
-	c.config.SleepDuration = sd
-	c.cancel()
-	c.Ctx, c.cancel = context.WithCancel(context.Background())
-	go c.Prune()
+func (c *Cache) isStarted() error {
+	if !initd {
+		return errors.New("cache not started")
+	}
+	return nil
 }

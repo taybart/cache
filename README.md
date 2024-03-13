@@ -28,6 +28,37 @@ func main() {
 }
 ```
 
+###### pubsub
+
+```go
+package main
+
+import (
+  "fmt"
+  "github.com/taybart/cache"
+)
+
+func main() {
+    c := cache.New(cache.Default())
+    defer c.Finish()
+
+    var wg sync.WaitGroup
+    wg.Add(1)
+
+    ch := c.Subscribe("general") // subscribe to key updates
+    go func(ch chan any) {
+        defer wg.Done()
+        item := <-ch
+        fmt.Println(item.(string)) // hello
+    }(ch)
+
+    c.Set("general", "hello")
+
+    wg.Wait()
+    return nil
+}
+```
+
 #### Shared
 
 ```go
@@ -54,7 +85,7 @@ func main() {
 
 ## Config
 
-#### Pruning 
+#### Pruning
 
 Defaults:
 TTL: 24 hours
