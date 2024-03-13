@@ -28,7 +28,7 @@ func main() {
 }
 ```
 
-###### pubsub
+#### Pub/Sub
 
 ```go
 package main
