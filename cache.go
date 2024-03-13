@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -69,6 +70,7 @@ func (c *Cache) Finish() {
 }
 
 func (c *Cache) Set(key string, data any) error {
+	c.isInit()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -87,6 +89,7 @@ func (c *Cache) Set(key string, data any) error {
 }
 
 func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
+	c.isInit()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -104,6 +107,7 @@ func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
 }
 
 func (c *Cache) Get(key string, data any) error {
+	c.isInit()
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if i, ok := c.items[key]; ok {
@@ -113,6 +117,7 @@ func (c *Cache) Get(key string, data any) error {
 }
 
 func (c *Cache) Prune() {
+	c.isInit()
 	if c.config.PruneRate == 0 {
 		return
 	}
@@ -149,6 +154,7 @@ prune:
 }
 
 func (c *Cache) Subscribe(key string) chan any {
+	c.isInit()
 	ch := make(chan any)
 	if len(c.subs[key]) == 0 {
 		c.subs[key] = make([]chan any, 0)
@@ -160,8 +166,14 @@ func (c *Cache) Subscribe(key string) chan any {
 }
 
 func (c *Cache) updateSubs(key string, update any) {
-	// TODO: work on sub locks
+	// FIXME: work on sub locks
 	for _, ch := range c.subs[key] {
 		ch <- update
+	}
+}
+
+func (c *Cache) isInit() {
+	if !c.init {
+		panic(fmt.Errorf("cache not started, use something like cache.New(cache.Default())"))
 	}
 }
