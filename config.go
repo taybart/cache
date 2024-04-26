@@ -10,17 +10,25 @@ var defaultConfig = Config{
 	SleepDuration: time.Millisecond * 100,
 }
 
+// Config for the cache
+// TTL: the time to live for an item
+// PruneRate: how often to prune the cache
+// SleepDuration: how long to sleep between prunes
 type Config struct {
 	TTL           time.Duration
 	PruneRate     time.Duration
 	SleepDuration time.Duration
 }
 
+// Default returns the default config
+// TTL: 24 hours
+// PruneRate: 5 minutes
+// SleepDuration: 100 milliseconds
 func Default() Config {
 	return defaultConfig
 }
 
-func (c *Config) Init() {
+func (c *Config) init() {
 	// make sure defaults are preserved
 	if c.TTL == 0 {
 		c.TTL = defaultConfig.TTL

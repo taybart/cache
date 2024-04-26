@@ -11,10 +11,12 @@ import (
 )
 
 var (
+	// ErrNotFound item is not found
 	ErrNotFound = errors.New("item not found")
 )
 
 const (
+	// TTLNeverExpire keep forever
 	TTLNeverExpire = -1
 )
 
@@ -22,6 +24,7 @@ var sharedCache = Cache{
 	items: make(map[string]Item),
 }
 
+// Cache is a simple key value store
 type Cache struct {
 	init   bool
 	config Config
@@ -32,14 +35,17 @@ type Cache struct {
 	subs   map[string][]chan any
 }
 
+// Item is a cache item
 type Item struct {
 	CreatedAt time.Time
 	TTL       time.Duration
 	Data      []byte
 }
 
+// New creates a new cache,
+// default config can be set with cache.New(cache.Default())
 func New(config Config) *Cache {
-	config.Init()
+	config.init()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &Cache{
@@ -56,7 +62,7 @@ func New(config Config) *Cache {
 
 func NewShared(config Config) *Cache {
 	if !sharedCache.init {
-		config.Init()
+		config.init()
 		sharedCache.config = config
 		sharedCache.init = true
 		sharedCache.Ctx = context.Background()
@@ -106,6 +112,7 @@ func (c *Cache) SetWithTTL(key string, data any, ttl time.Duration) error {
 	return nil
 }
 
+// Get will get the data if it exists, returns cache.ErrNotFound on error
 func (c *Cache) Get(key string, data any) error {
 	c.isInit()
 	c.mu.RLock()
@@ -114,6 +121,73 @@ func (c *Cache) Get(key string, data any) error {
 		return gob.NewDecoder(bytes.NewReader(i.Data)).Decode(data)
 	}
 	return ErrNotFound
+}
+
+// GetFallback will get the data if it exists
+// otherwise it will set the data and return it
+func (c *Cache) GetFallback(key string, get *any, set func() (any, error)) error {
+	c.isInit()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if i, ok := c.items[key]; ok {
+		return gob.NewDecoder(bytes.NewReader(i.Data)).Decode(get)
+	}
+
+	var buf bytes.Buffer
+	s, err := set()
+	if err != nil {
+		return err
+	}
+
+	*get = s
+
+	if err := gob.NewEncoder(&buf).Encode(s); err != nil {
+		return err
+	}
+	update := Item{
+		CreatedAt: time.Now(),
+		Data:      buf.Bytes(),
+		TTL:       c.config.TTL,
+	}
+	(*c).items[key] = update
+
+	c.updateSubs(key, update)
+	if i, ok := c.items[key]; ok {
+		return gob.NewDecoder(bytes.NewReader(i.Data)).Decode(get)
+	}
+	return ErrNotFound
+}
+
+// GetFallbackWithTTL will get the data if it exists
+// otherwise it will set the data and return it
+func (c *Cache) GetFallbackWithTTL(key string, get *any, ttl time.Duration, set func() (any, error)) error {
+	c.isInit()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if i, ok := c.items[key]; ok {
+		return gob.NewDecoder(bytes.NewReader(i.Data)).Decode(get)
+	}
+	var buf bytes.Buffer
+	s, err := set()
+	if err != nil {
+		return err
+	}
+
+	*get = s
+
+	if err = gob.NewEncoder(&buf).Encode(s); err != nil {
+		return err
+	}
+	item := Item{
+		CreatedAt: time.Now(),
+		Data:      buf.Bytes(),
+		TTL:       ttl,
+	}
+	(*c).items[key] = item
+	c.updateSubs(key, item)
+	return nil
 }
 
 func (c *Cache) Prune() {
